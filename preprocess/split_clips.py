@@ -1,12 +1,11 @@
 import os
 import json
-import imageio
+import imageio  # NOTE: I tried to use cv2.VideoCapture, but it didn't work well.
 import numpy as np
 from streaming import MDSWriter
 from tqdm import tqdm
-import ffmpeg
 
-BASE_DIR = "/root/projects/rl-nlp/videos/dataset/00000/"
+BASE_DIR = "/root/projects/rl-nlp/videos/dataset/00000/"  # NOTE: video2dataset creates more directories other than 00000. I used only 00000 because my machine doesn't have enough space.
 
 def convert_time_to_seconds(time_str):
     hours, minutes, seconds = map(float, time_str.split(":"))
@@ -19,24 +18,17 @@ for video_filename in tqdm(os.listdir(BASE_DIR)):
         continue
 
     file_basename = os.path.splitext(video_filename)[0]
+
+    # Each video is expected to have a pair of video file and json file.
     video_file_path = os.path.join(BASE_DIR, video_filename)
     json_file_path = os.path.join(BASE_DIR, f"{file_basename}.json")
 
     if os.path.exists(json_file_path):
         pass
     else:
-        continue
+        continue  # NOTE: Some videos miss the json file
 
     reader = imageio.get_reader(video_file_path)
-
-    # probe = ffmpeg.probe(video_file_path)
-    # video_info = next(stream for stream in probe['streams'] if stream['codec_type'] == 'video')
-    # print(video_info)
-
-    # probe = ffmpeg.probe(video_file_path, select_streams="v:0", show_entries="frame=pkt_pts_time,key_frame", read_intervals="%+#1")
-    # frames = probe["frames"]
-    # keyframe_timestamps = [frame["pkt_pts_time"] for frame in frames if frame["key_frame"] == 1]
-    # print(keyframe_timestamps)
 
     frames = []
     subtitles = []
@@ -44,53 +36,44 @@ for video_filename in tqdm(os.listdir(BASE_DIR)):
     with open(json_file_path, 'r') as f:
         data = json.load(f)
         fps = reader.get_meta_data()['fps']
-        # fps = data["yt_meta_dict"]["info"]["fps"]
+        # fps = data["yt_meta_dict"]["info"]["fps"]  # NOTE: This is not always available
         try:
-            subtitle_data = data["yt_meta_dict"]["subtitles"]
+            subtitle_data = data["yt_meta_dict"]["subtitles"]  # NOTE: This is not always available
         except KeyError:
             continue
-        # if data["yt_meta_dict"] is None:
-        #     continue
 
         for i, subtitle in enumerate(subtitle_data):
-            start_time = convert_time_to_seconds(subtitle["start"])
-            end_time = convert_time_to_seconds(subtitle["end"])
+            start_time = convert_time_to_seconds(subtitle["start"])  # Start time of the subtitle.
+            end_time = convert_time_to_seconds(subtitle["end"])  # End time of the subtitle.
 
-            j = 0
-            # current_time = 0.0
-            while start_time < end_time:
-                chunk_end_time = start_time + 1.0  # 60 seconds
+            while start_time < end_time:  # Cut videos between start_time and end_time into 1 second chunks.
+                chunk_end_time = start_time + 1.0  #  1.0 second chunks
                 if chunk_end_time > end_time:
                     chunk_end_time = end_time
-                    # break  # Because we get error around the ened of the video
-                
-                # while current_time < chunk_end_time:
+
                 frame_idx = int(start_time * fps)
-                # reader = imageio.get_reader(video_file_path)  # Initialize here to avoid potential errors caused by jumping between frames
 
                 try: 
                     frame = reader.get_data(frame_idx)
                 except IndexError:
-                    break
+                    break  # NOTE: I sometimes get IndexError even when frame_idx is less than the number of frames. I don't know why.
 
                 if frame is None:
                     break
-                frame_array = np.array(frame)  # Convert each frame to a numpy array
+                frame_array = np.array(frame)
 
                 frames.append(frame_array)
                 subtitles.append(np.frombuffer(subtitle["lines"][0].encode('utf-8'), dtype=np.uint8))
 
                 start_time = chunk_end_time
-                j += 1
 
-        # cap.release()
     try:
         MAX_LENGTH = max([len(sub) for sub in subtitles])
     except ValueError:
-        print('max() arg is an empty sequence')
+        print('max() arg is an empty sequence')  # NOTE: If all intervals of subtitles are less than 1 second, we get an empty sequence.
         continue
 
-    padded_subtitles = [np.pad(sub, (0, MAX_LENGTH - len(sub))) for sub in subtitles]
+    padded_subtitles = [np.pad(sub, (0, MAX_LENGTH - len(sub))) for sub in subtitles]  # NOTE: Pad each subtitle to the same length
 
     video_data = {
         'frame': np.asarray(frames, dtype=np.float32),
