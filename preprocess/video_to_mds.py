@@ -5,7 +5,6 @@ import numpy as np
 from streaming import MDSWriter
 from tqdm import tqdm
 
-# NOTE: `dataset_downsampled` contains the dataset of 1fps videos.
 BASE_DIR = "/root/projects/rl-nlp/videos/dataset_downsampled/00000/"  # NOTE: video2dataset creates more directories other than 00000. I used only 00000 because my machine doesn't have enough space.
 
 def convert_time_to_seconds(time_str):
@@ -13,7 +12,7 @@ def convert_time_to_seconds(time_str):
     return hours * 3600 + minutes * 60 + seconds
 
 
-SAVE_PATH = "/root/projects/rl-nlp/videos/data_downsampled/mds/00000"
+SAVE_PATH = "/root/projects/rl-nlp/videos/data_downsampled/mds-not-split/00000"
 os.makedirs(SAVE_PATH, exist_ok=True)
 
 COLUMNS = {
@@ -23,9 +22,9 @@ COLUMNS = {
 COMPRESSION = 'zstd'
 HASHES = 'sha1', 'xxh64'
 
-with MDSWriter(out=SAVE_PATH, columns=COLUMNS, compression=COMPRESSION, hashes=HASHES) as save_file:
+with MDSWriter(out=SAVE_PATH, columns=COLUMNS, compression=COMPRESSION, hashes=HASHES) as save_file:        
 
-    for video_filename in tqdm(os.listdir(BASE_DIR)):
+    for video_filename in tqdm(os.listdir(BASE_DIR)):  # NOTE: I used only 10 videos for the test because the space of my machine is limited.
         if not video_filename.endswith(".mp4"):
             continue
 
@@ -55,14 +54,11 @@ with MDSWriter(out=SAVE_PATH, columns=COLUMNS, compression=COMPRESSION, hashes=H
             except KeyError:
                 continue
 
-            for i, subtitle in enumerate(subtitle_data):
+            for subtitle in subtitle_data:
                 start_time = convert_time_to_seconds(subtitle["start"])  # Start time of the subtitle.
                 end_time = convert_time_to_seconds(subtitle["end"])  # End time of the subtitle.
 
-                while start_time < end_time:  # Cut videos between start_time and end_time into 1 second chunks.
-                    chunk_end_time = start_time + 2.0  #  2.0 second chunks because fps is 1.0 and 2.0 is larger than 1.0.
-                    if chunk_end_time > end_time:
-                        chunk_end_time = end_time
+                while start_time < end_time:
 
                     frame_idx = int(start_time * fps)
 
@@ -76,10 +72,11 @@ with MDSWriter(out=SAVE_PATH, columns=COLUMNS, compression=COMPRESSION, hashes=H
 
                     frame_array = np.array(frame)
 
-                    frames.append(frame_array)
+                    frames.append(frame_array)  # NOTE: Save the frame only when there is a subtitle.
                     subtitles.append(np.frombuffer(subtitle["lines"][0].encode('utf-8'), dtype=np.uint8))
 
-                    start_time = chunk_end_time
+                    start_time += 1.0  # NOTE: 1fps
+
 
         try:
             MAX_LENGTH = max([len(sub) for sub in subtitles])
