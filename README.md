@@ -15,8 +15,22 @@ video2dataset \\
 --output_folder="dataset"
 ```
 - https://github.com/iejMac/video2dataset
-### Split Videos & Subtitles and Save them as StreamingDataset
+
+### Change Videos to 1fps
 ```bash
 cd preprocess
-python split_clips.py
+./change_fps.sh
+./copy_json.sh
+```
+
+### Split Videos & Subtitles and Save them as StreamingDataset
+Option1
+```bash
+cd preprocess
+python video_to_mds.py
+```
+Option2
+```bash
+cd preprocess
+python video_to_mds_pre_split.py
 ```
