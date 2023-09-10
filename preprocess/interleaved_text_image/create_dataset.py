@@ -160,7 +160,7 @@ class ConcatTokensDataset(IterableDataset):
             }
 
             yield {
-                'frame': np.asarray(frames, dtype=np.float32).transpose(0, 3, 1, 2),  # N, H, W, C -> N, C, H, W
+                'frame': np.asarray(frames, dtype=np.float32),  # N, H, W, C
                 'subtitle_data': subtitle_data,
             }
 
